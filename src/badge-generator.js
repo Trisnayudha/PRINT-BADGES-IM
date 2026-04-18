@@ -1,0 +1,238 @@
+const puppeteer = require('puppeteer');
+const QRCode = require('qrcode');
+const path = require('path');
+const fs = require('fs');
+
+const TEMP_DIR = path.join(__dirname, '..', 'temp');
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+
+// Measured from template-empty.png (1240×1772px = 105×150mm)
+// White content box:  top=38.3mm, bottom=119.4mm  (height=81.1mm)
+// Gold footer area:   top=119.5mm, bottom=150mm    (height=30.5mm)
+const LAYOUT = {
+  contentTop: 38.5,
+  contentHeight: 81,
+  footerTop: 119.5,
+  footerHeight: 30.5,
+};
+
+let browser = null;
+
+async function getBrowser() {
+  if (!browser || !browser.connected) {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+  }
+  return browser;
+}
+
+function getFontSize(text, maxLen, baseSize, minSize) {
+  if (!text || text.length <= maxLen) return baseSize;
+  return Math.max(Math.round(baseSize * maxLen / text.length), minSize);
+}
+
+function buildAccessRow(access) {
+  const all = ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'];
+  const areas = (access && access.length > 0) ? access : all;
+  return areas.map((a, i) =>
+    i < areas.length - 1
+      ? `<span class="acc-item">${a}</span><span class="acc-sep"></span>`
+      : `<span class="acc-item">${a}</span>`
+  ).join('');
+}
+
+function buildBadgeHtml(data, qrDataUrl) {
+  const {
+    display_name,
+    name,
+    company = '',
+    department = '',
+    ticket_type = 'DELEGATE',
+    access,
+  } = data;
+
+  const primaryName = display_name || (name ? name.split(' ')[0] : '');
+  const secondaryName = display_name
+    ? name
+    : (name ? name.split(' ').slice(1).join(' ') : '');
+
+  const primaryFontSize = getFontSize(primaryName, 10, 34, 18);
+
+  const { contentTop, contentHeight, footerTop, footerHeight } = LAYOUT;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 105mm;
+    height: 150mm;
+    background: transparent;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-family: 'Segoe UI', Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  }
+
+  /* Names top + QR bottom-right — overlaid on white box of pre-printed template */
+  .content {
+    position: absolute;
+    top: ${contentTop}mm;
+    left: 5mm;
+    right: 5mm;
+    height: ${contentHeight}mm;
+    display: flex;
+    flex-direction: column;
+    padding: 5mm 2mm 4mm 2mm;
+  }
+
+  .name-primary {
+    font-size: ${primaryFontSize}pt;
+    font-weight: 900;
+    color: #162455;
+    line-height: 1;
+    margin-bottom: 2mm;
+  }
+
+  .name-secondary {
+    font-size: 20pt;
+    font-weight: 400;
+    color: #162455;
+    line-height: 1.2;
+    margin-bottom: 3mm;
+  }
+
+  .dept {
+    font-size: 12pt;
+    color: #000;
+    font-weight: 400;
+    margin-bottom: 1.5mm;
+  }
+
+  .company {
+    font-size: 12pt;
+    font-weight: 400;
+    color: #000;
+    line-height: 1.3;
+  }
+
+  /* QR floats to bottom-right, with some margin from edge */
+  .qr-wrap {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding-right: 5mm;
+    padding-bottom: 2mm;
+  }
+
+  .qr-wrap img {
+    width: 30mm;
+    height: 30mm;
+  }
+
+  /* DELEGATE + access — overlaid on gold footer of pre-printed template */
+  .footer {
+    position: absolute;
+    top: ${footerTop}mm;
+    left: 0;
+    right: 0;
+    height: ${footerHeight}mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3mm;
+  }
+
+  .ticket-type {
+    font-size: 22pt;
+    font-weight: 900;
+    color: #000;
+    letter-spacing: 0.5pt;
+  }
+
+  .access-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5mm;
+  }
+
+  .acc-item {
+    font-size: 6.5pt;
+    font-weight: 700;
+    color: #000;
+    white-space: nowrap;
+  }
+
+  .acc-sep {
+    display: inline-block;
+    width: 7mm;
+    height: 1.5px;
+    background: #1B2850;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="content">
+  <div class="name-primary">${primaryName}</div>
+  ${secondaryName ? `<div class="name-secondary">${secondaryName}</div>` : ''}
+  ${department ? `<div class="dept">${department}</div>` : ''}
+  ${company ? `<div class="company">${company}</div>` : ''}
+  <div class="qr-wrap">
+    <img src="${qrDataUrl}" alt="QR">
+  </div>
+</div>
+
+<div class="footer">
+  <div class="ticket-type">${ticket_type.toUpperCase()}</div>
+  <div class="access-row">
+    ${buildAccessRow(access)}
+  </div>
+</div>
+
+</body>
+</html>`;
+}
+
+async function generateBadgePdf(data) {
+  const qrContent = data.qr_code || data.badge_id || data.guest_id || 'NO-QR';
+  const qrDataUrl = await QRCode.toDataURL(qrContent, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 300,
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+
+  const html = buildBadgeHtml(data, qrDataUrl);
+  const b = await getBrowser();
+  const page = await b.newPage();
+
+  try {
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfPath = path.join(TEMP_DIR, `badge_${Date.now()}.pdf`);
+    await page.pdf({
+      path: pdfPath,
+      width: '105mm',
+      height: '150mm',
+      printBackground: false, // transparent — only text+QR prints over pre-printed template
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    return pdfPath;
+  } finally {
+    await page.close();
+  }
+}
+
+async function closeBrowser() {
+  if (browser) await browser.close();
+}
+
+module.exports = { generateBadgePdf, closeBrowser };

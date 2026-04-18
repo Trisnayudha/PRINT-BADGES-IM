@@ -1,0 +1,74 @@
+IM SCAN — PRINT SERVER  |  QUICK START
+=======================================
+
+PRASYARAT
+---------
+- Node.js 18+ terinstall (https://nodejs.org)
+- Printer sudah terhubung ke laptop
+
+
+LANGKAH 1 — Install
+--------------------
+Buka terminal di folder project, jalankan:
+
+    npm install
+
+(Pertama kali ~5-10 menit karena download Chromium)
+
+
+LANGKAH 2 — Konfigurasi
+------------------------
+Copy file konfigurasi:
+
+    Mac/Linux : cp .env.example .env
+    Windows   : copy .env.example .env
+
+Edit file .env, isi nama printer:
+
+    PRINTER_NAME=NamaPrintermu
+
+Cek nama printer:
+    Mac     : lpstat -a
+    Windows : Get-Printer | Select-Object Name  (PowerShell)
+
+
+LANGKAH 3 — Jalankan Server
+-----------------------------
+    npm start
+
+Output sukses:
+    ✓ IM Scan Print Server running on port 3000
+
+
+LANGKAH 4 — Test
+-----------------
+1. Buka browser di laptop: http://localhost:3000
+2. Scroll ke bagian "Test Print"
+3. Isi data lalu klik "Cetak Test Badge"
+4. Cek antrian di tabel — status harus berubah jadi "done"
+
+Atau test via terminal:
+    curl -X POST http://localhost:3000/print \
+      -H "Content-Type: application/json" \
+      -d '{"name":"John Doe","company":"PT Test","ticket_type":"DELEGATE","qr_code":"TEST-001"}'
+
+
+VERIFIKASI DARI TABLET
+-----------------------
+Cari IP laptop:
+    Mac     : ipconfig getifaddr en0
+    Windows : ipconfig  (lihat IPv4 Address)
+
+Buka di browser tablet:
+    http://[IP_LAPTOP]:3000/health
+
+Harus muncul: {"ok":true,...}
+
+
+TROUBLESHOOTING CEPAT
+----------------------
+- Print gagal     : Cek PRINTER_NAME di .env sudah benar persis
+- Tidak bisa akses dari tablet : Laptop & tablet harus 1 jaringan WiFi
+- Windows firewall : Izinkan node.exe di Windows Defender Firewall
+
+Detail lengkap: lihat README.md
