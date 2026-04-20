@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const config = require('./config');
-const { generateBadgePdf, closeBrowser } = require('./badge-generator');
+const { generateBadgePdf, generateBadgeHtmlPreview, closeBrowser } = require('./badge-generator');
 const { printPdf, listPrinters } = require('./printer');
 const queue = require('./print-queue');
 
@@ -49,6 +49,17 @@ app.post('/api/queue/retry', async (_, res) => {
   res.json({ retrying: pending.length });
   for (const job of pending) {
     await processPrintJob(job.id, job.data, job.data.copies || config.defaultCopies);
+  }
+});
+
+// ── Badge HTML preview (for UI live preview)
+app.post('/api/preview', async (req, res) => {
+  try {
+    const html = await generateBadgeHtmlPreview(req.body);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

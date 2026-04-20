@@ -40,6 +40,12 @@
   #testResult.ok { background: #dcfce7; color: #166534; }
   #testResult.err { background: #fee2e2; color: #991b1b; }
   .empty-state { text-align: center; color: #aaa; padding: 24px; font-size: 13px; }
+  .test-layout { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
+  @media (max-width: 640px) { .test-layout { grid-template-columns: 1fr; } }
+  .preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .preview-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .4px; }
+  .preview-scale { width: 158px; height: 225px; overflow: hidden; position: relative; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.1); flex-shrink: 0; }
+  .preview-scale iframe { width: 396px; height: 566px; border: none; transform: scale(0.4); transform-origin: top left; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -89,44 +95,56 @@
 
   <div class="card">
     <h2>Test Print</h2>
-    <div id="testSection">
-      <div>
-        <label>Nama (display besar)</label>
-        <input id="testDisplayName" value="Calliope" placeholder="Nama tampil besar">
+    <div class="test-layout">
+      <div id="testSection">
+        <div>
+          <label>Nama (display besar)</label>
+          <input id="testDisplayName" value="Calliope" placeholder="Nama tampil besar">
+        </div>
+        <div>
+          <label>Nama Lengkap</label>
+          <input id="testName" value="Anastasia Nagisa" placeholder="Nama lengkap">
+        </div>
+        <div>
+          <label>Perusahaan</label>
+          <input id="testCompany" value="INDONESIAMINER BISNIS GLOBAL">
+        </div>
+        <div>
+          <label>Departemen / Jabatan</label>
+          <input id="testDepartment" value="Marketing &amp; Corporate">
+        </div>
+        <div>
+          <label>Tipe Tiket</label>
+          <select id="testTicket">
+            <option value="DELEGATE">DELEGATE</option>
+            <option value="EXHIBITOR">EXHIBITOR</option>
+            <option value="SPEAKER">SPEAKER</option>
+            <option value="PRESS">PRESS</option>
+            <option value="VIP">VIP</option>
+            <option value="ORGANIZER">ORGANIZER</option>
+          </select>
+        </div>
+        <div>
+          <label>QR Code Content</label>
+          <input id="testQr" value="EVT2026-TEST-001">
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="testPrint()" style="width:100%;padding:12px;">
+            Cetak Test Badge
+          </button>
+        </div>
+        <div id="testResult"></div>
       </div>
-      <div>
-        <label>Nama Lengkap</label>
-        <input id="testName" value="Anastasia Nagisa" placeholder="Nama lengkap">
-      </div>
-      <div>
-        <label>Perusahaan</label>
-        <input id="testCompany" value="INDONESIAMINER BISNIS GLOBAL">
-      </div>
-      <div>
-        <label>Departemen / Jabatan</label>
-        <input id="testDepartment" value="Marketing &amp; Corporate">
-      </div>
-      <div>
-        <label>Tipe Tiket</label>
-        <select id="testTicket">
-          <option value="DELEGATE">DELEGATE</option>
-          <option value="EXHIBITOR">EXHIBITOR</option>
-          <option value="SPEAKER">SPEAKER</option>
-          <option value="PRESS">PRESS</option>
-          <option value="VIP">VIP</option>
-          <option value="ORGANIZER">ORGANIZER</option>
-        </select>
-      </div>
-      <div>
-        <label>QR Code Content</label>
-        <input id="testQr" value="EVT2026-TEST-001">
-      </div>
-      <div>
-        <button class="btn btn-primary" onclick="testPrint()" style="width:100%;padding:12px;">
-          Cetak Test Badge
+
+      <div class="preview-wrap">
+        <div class="preview-label">Preview Badge</div>
+        <div class="preview-scale">
+          <iframe id="badgePreview"></iframe>
+        </div>
+        <button class="btn" onclick="refreshPreview()" style="background:#f0f0f0;color:#333;font-size:12px;padding:5px 12px;">
+          Refresh Preview
         </button>
       </div>
-      <div id="testResult"></div>
     </div>
   </div>
 
@@ -201,19 +219,44 @@ async function deleteJob(id) {
   loadQueue();
 }
 
+function getTestPayload() {
+  return {
+    display_name: document.getElementById('testDisplayName').value,
+    name: document.getElementById('testName').value,
+    company: document.getElementById('testCompany').value,
+    department: document.getElementById('testDepartment').value,
+    ticket_type: document.getElementById('testTicket').value,
+    qr_code: document.getElementById('testQr').value,
+    access: ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'],
+  };
+}
+
+let previewDebounce = null;
+async function refreshPreview() {
+  try {
+    const r = await fetch(`${BASE}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getTestPayload()),
+    });
+    const html = await r.text();
+    const iframe = document.getElementById('badgePreview');
+    iframe.srcdoc = html;
+  } catch (e) {
+    console.error('Preview failed:', e);
+  }
+}
+
+function schedulePreview() {
+  clearTimeout(previewDebounce);
+  previewDebounce = setTimeout(refreshPreview, 600);
+}
+
 async function testPrint() {
   const resultEl = document.getElementById('testResult');
   resultEl.style.display = 'none';
   try {
-    const payload = {
-      display_name: document.getElementById('testDisplayName').value,
-      name: document.getElementById('testName').value,
-      company: document.getElementById('testCompany').value,
-      department: document.getElementById('testDepartment').value,
-      ticket_type: document.getElementById('testTicket').value,
-      qr_code: document.getElementById('testQr').value,
-      access: ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'],
-    };
+    const payload = getTestPayload();
     const r = await fetch(`${BASE}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -233,7 +276,13 @@ async function testPrint() {
 
 fetchHealth();
 loadQueue();
+refreshPreview();
 setInterval(() => { fetchHealth(); loadQueue(); }, 5000);
+
+['testDisplayName','testName','testCompany','testDepartment','testQr'].forEach(id => {
+  document.getElementById(id).addEventListener('input', schedulePreview);
+});
+document.getElementById('testTicket').addEventListener('change', refreshPreview);
 </script>
 </body>
 </html>

@@ -43,7 +43,7 @@ function buildAccessRow(access) {
   ).join('');
 }
 
-function buildBadgeHtml(data, qrDataUrl) {
+function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
   const {
     display_name,
     name,
@@ -62,6 +62,27 @@ function buildBadgeHtml(data, qrDataUrl) {
 
   const { contentTop, contentHeight, footerTop, footerHeight } = LAYOUT;
 
+  const templateDataUrl = previewMode ? (() => {
+    try {
+      const imgPath = path.join(__dirname, '..', 'public', 'template-empty.png');
+      const buf = fs.readFileSync(imgPath);
+      return `data:image/png;base64,${buf.toString('base64')}`;
+    } catch { return null; }
+  })() : null;
+
+  const previewBg = templateDataUrl ? `
+  .template-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 105mm; height: 150mm;
+    background: url('${templateDataUrl}') no-repeat top left / 100% 100%;
+    z-index: 0;
+  }
+  .content, .footer { z-index: 1; }
+  ` : '';
+
+  const previewDivs = templateDataUrl ? `<div class="template-bg"></div>` : '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -77,6 +98,7 @@ function buildBadgeHtml(data, qrDataUrl) {
     print-color-adjust: exact;
     font-family: 'Segoe UI', Arial, 'Helvetica Neue', Helvetica, sans-serif;
   }
+  ${previewBg}
 
   /* Names top + QR bottom-right — overlaid on white box of pre-printed template */
   .content {
@@ -93,7 +115,7 @@ function buildBadgeHtml(data, qrDataUrl) {
   .name-primary {
     font-size: ${primaryFontSize}pt;
     font-weight: 900;
-    color: #162455;
+    color: #000;
     line-height: 1;
     margin-bottom: 2mm;
   }
@@ -101,7 +123,7 @@ function buildBadgeHtml(data, qrDataUrl) {
   .name-secondary {
     font-size: 20pt;
     font-weight: 400;
-    color: #162455;
+    color: #000;
     line-height: 1.2;
     margin-bottom: 3mm;
   }
@@ -139,7 +161,7 @@ function buildBadgeHtml(data, qrDataUrl) {
   .footer {
     position: absolute;
     top: ${footerTop}mm;
-    left: 0;
+    left: 5px;
     right: 0;
     height: ${footerHeight}mm;
     display: flex;
@@ -164,7 +186,7 @@ function buildBadgeHtml(data, qrDataUrl) {
   }
 
   .acc-item {
-    font-size: 6.5pt;
+    font-size: 8pt;
     font-weight: 700;
     color: #000;
     white-space: nowrap;
@@ -173,15 +195,15 @@ function buildBadgeHtml(data, qrDataUrl) {
   .acc-sep {
     display: inline-block;
     width: 7mm;
-    height: 1.5px;
-    background: #1B2850;
+    height: 0;
+    border-top: 1.5px solid #1B2850;
     vertical-align: middle;
     flex-shrink: 0;
   }
 </style>
 </head>
 <body>
-
+${previewDivs}
 <div class="content">
   <div class="name-primary">${primaryName}</div>
   ${secondaryName ? `<div class="name-secondary">${secondaryName}</div>` : ''}
@@ -232,8 +254,19 @@ async function generateBadgePdf(data) {
   }
 }
 
+async function generateBadgeHtmlPreview(data) {
+  const qrContent = data.qr_code || data.badge_id || data.guest_id || 'NO-QR';
+  const qrDataUrl = await QRCode.toDataURL(qrContent, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 300,
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+  return buildBadgeHtml(data, qrDataUrl, true);
+}
+
 async function closeBrowser() {
   if (browser) await browser.close();
 }
 
-module.exports = { generateBadgePdf, closeBrowser };
+module.exports = { generateBadgePdf, generateBadgeHtmlPreview, closeBrowser };
