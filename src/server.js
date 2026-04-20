@@ -79,9 +79,10 @@ async function processPrintJob(jobId, data, copies) {
     queue.updateJob(jobId, { status: 'done', error: null });
     console.log(`[PRINTED] ${data.display_name || data.name} | job ${jobId}`);
   } catch (err) {
+    const errMsg = err?.message || String(err) || 'unknown error';
     const retries = (queue.getAllJobs().find(j => j.id === jobId)?.retries || 0) + 1;
-    queue.updateJob(jobId, { status: 'failed', error: err.message, retries });
-    console.error(`[FAILED] job ${jobId}: ${err.message}`);
+    queue.updateJob(jobId, { status: 'failed', error: errMsg, retries });
+    console.error(`[FAILED] job ${jobId}: ${errMsg}`);
   } finally {
     if (pdfPath && fs.existsSync(pdfPath)) {
       fs.unlinkSync(pdfPath);

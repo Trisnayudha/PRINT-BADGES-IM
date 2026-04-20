@@ -87,7 +87,7 @@ function buildBadgeHtml(data, qrDataUrl) {
     height: ${contentHeight}mm;
     display: flex;
     flex-direction: column;
-    padding: 5mm 2mm 4mm 2mm;
+    padding: 5mm 2mm 4mm 6mm;
   }
 
   .name-primary {
@@ -146,6 +146,7 @@ function buildBadgeHtml(data, qrDataUrl) {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    text-align: center;
     gap: 3mm;
   }
 
