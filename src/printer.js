@@ -9,7 +9,7 @@ async function printPdf(pdfPath, copies = 1) {
   if (isWindows) {
     const { print } = require('pdf-to-printer');
     const options = {
-      scale: 'noscale',
+      scale: 'fit',
       side: 'simplex',
       ...(config.printerName ? { printer: config.printerName } : {}),
     };
