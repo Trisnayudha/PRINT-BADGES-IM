@@ -10,7 +10,7 @@ async function printPdf(pdfPath, copies = 1) {
     const { print } = require('pdf-to-printer');
     const options = {
       scale: 'noscale',
-      side: 'one-sided',
+      side: 'simplex',
       ...(config.printerName ? { printer: config.printerName } : {}),
     };
     for (let i = 0; i < copies; i++) {
