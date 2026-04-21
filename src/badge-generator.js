@@ -36,11 +36,7 @@ function getFontSize(text, maxLen, baseSize, minSize) {
 function buildAccessRow(access) {
   const all = ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'];
   const areas = (access && access.length > 0) ? access : all;
-  return areas.map((a, i) =>
-    i < areas.length - 1
-      ? `<span class="acc-item">${a}</span><span class="acc-sep"></span>`
-      : `<span class="acc-item">${a}</span>`
-  ).join('');
+  return areas.join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
 }
 
 function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
@@ -161,18 +157,18 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
   .footer {
     position: absolute;
     top: ${footerTop}mm;
-    left: 5px;
+    left: 0;
     right: 0;
     height: ${footerHeight}mm;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    text-align: center;
     gap: 3mm;
   }
 
   .ticket-type {
+    width: 100%;
+    text-align: center;
     font-size: 22pt;
     font-weight: 900;
     color: #000;
@@ -180,25 +176,12 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
   }
 
   .access-row {
-    display: flex;
-    align-items: center;
-    gap: 1.5mm;
-  }
-
-  .acc-item {
+    width: 100%;
+    text-align: center;
     font-size: 8pt;
     font-weight: 700;
     color: #000;
-    white-space: nowrap;
-  }
-
-  .acc-sep {
-    display: inline-block;
-    width: 7mm;
-    height: 0;
-    border-top: 1.5px solid #1B2850;
-    vertical-align: middle;
-    flex-shrink: 0;
+    letter-spacing: 0.3pt;
   }
 </style>
 </head>
