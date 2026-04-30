@@ -78,6 +78,11 @@
         <div class="value" id="totalFailed" style="color:#ef4444;">–</div>
       </div>
     </div>
+    <div id="ngrokBar" style="display:none;margin-top:14px;padding:10px 14px;background:#f0f4ff;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;">Ngrok URL</span>
+      <span id="ngrokUrl" style="font-family:monospace;font-size:13px;color:#1B2E80;word-break:break-all;flex:1;"></span>
+      <button class="btn" onclick="copyNgrok()" style="background:#1B2E80;color:white;font-size:12px;padding:4px 12px;flex-shrink:0;">Copy</button>
+    </div>
   </div>
 
   <div class="card">
@@ -116,12 +121,16 @@
         <div>
           <label>Tipe Tiket</label>
           <select id="testTicket">
-            <option value="DELEGATE">DELEGATE</option>
-            <option value="EXHIBITOR">EXHIBITOR</option>
-            <option value="SPEAKER">SPEAKER</option>
-            <option value="PRESS">PRESS</option>
-            <option value="VIP">VIP</option>
-            <option value="ORGANIZER">ORGANIZER</option>
+            <option value="Delegate">Delegate</option>
+            <option value="Speaker Pass">Speaker Pass</option>
+            <option value="Workshop Pass">Workshop Pass</option>
+            <option value="Exhibitor Pass">Exhibitor Pass</option>
+            <option value="Explore Pass">Explore Pass</option>
+            <option value="Investor Pass">Investor Pass</option>
+            <option value="Mining Pass">Mining Pass</option>
+            <option value="Media Pass">Media Pass</option>
+            <option value="Networking Pass">Networking Pass</option>
+            <option value="Working Pass">Working Pass</option>
           </select>
         </div>
         <div>
@@ -152,6 +161,19 @@
 
 <script>
 const BASE = '';
+
+const TICKET_MAP = {
+  'Delegate':       { ticket_color: '#1428DF', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Speaker Pass':   { ticket_color: '#D60000', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Workshop Pass':  { ticket_color: '#DAA520', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Exhibitor Pass': { ticket_color: '#FFD700', access_areas: ['Exhibition', 'Networking Functions'] },
+  'Explore Pass':   { ticket_color: '#F97316', access_areas: ['Exhibition'] },
+  'Investor Pass':  { ticket_color: '#1E90FF', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Mining Pass':    { ticket_color: '#228B22', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Media Pass':     { ticket_color: '#8A2BE2', access_areas: ['Conference', 'Exhibition', 'Networking Functions'] },
+  'Networking Pass':{ ticket_color: '#00CED1', access_areas: ['Networking Functions'] },
+  'Working Pass':   { ticket_color: '#DAA520', access_areas: [] },
+};
 
 async function fetchHealth() {
   try {
@@ -220,14 +242,17 @@ async function deleteJob(id) {
 }
 
 function getTestPayload() {
+  const ticket_type = document.getElementById('testTicket').value;
+  const { ticket_color, access_areas } = TICKET_MAP[ticket_type] || { ticket_color: '#000000', access_areas: [] };
   return {
     display_name: document.getElementById('testDisplayName').value,
     name: document.getElementById('testName').value,
     company: document.getElementById('testCompany').value,
-    department: document.getElementById('testDepartment').value,
-    ticket_type: document.getElementById('testTicket').value,
+    job_title: document.getElementById('testDepartment').value,
+    ticket_type,
+    ticket_color,
+    access_areas,
     qr_code: document.getElementById('testQr').value,
-    access: ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'],
   };
 }
 
@@ -274,10 +299,35 @@ async function testPrint() {
   }
 }
 
+async function fetchNgrok() {
+  try {
+    const r = await fetch(`${BASE}/api/ngrok`);
+    const { url } = await r.json();
+    const bar = document.getElementById('ngrokBar');
+    if (url) {
+      document.getElementById('ngrokUrl').textContent = url;
+      bar.style.display = 'flex';
+    } else {
+      bar.style.display = 'none';
+    }
+  } catch { /* ngrok tidak aktif */ }
+}
+
+function copyNgrok() {
+  const url = document.getElementById('ngrokUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
 fetchHealth();
+fetchNgrok();
 loadQueue();
 refreshPreview();
 setInterval(() => { fetchHealth(); loadQueue(); }, 5000);
+setInterval(fetchNgrok, 15000);
 
 ['testDisplayName','testName','testCompany','testDepartment','testQr'].forEach(id => {
   document.getElementById(id).addEventListener('input', schedulePreview);

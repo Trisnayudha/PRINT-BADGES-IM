@@ -34,9 +34,12 @@ function getFontSize(text, maxLen, baseSize, minSize) {
 }
 
 function buildAccessRow(access) {
-  const all = ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'];
-  const areas = (access && access.length > 0) ? access : all;
-  return areas.join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
+  // null/undefined → show all (fallback). Empty array [] → no access row (e.g. Working Pass).
+  if (access === null || access === undefined) {
+    return ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'].join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
+  }
+  if (access.length === 0) return null;
+  return access.map(a => a.toUpperCase()).join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
 }
 
 function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
@@ -45,9 +48,15 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     name,
     company = '',
     department = '',
+    job_title = '',
     ticket_type = 'DELEGATE',
     access,
+    access_areas,
   } = data;
+
+  // Normalize: PHP sends access_areas + job_title, Flutter may send access + department
+  const resolvedDept = department || job_title;
+  const resolvedAccess = access_areas !== undefined ? access_areas : access;
 
   const primaryName = display_name || (name ? name.split(' ')[0] : '');
   const secondaryName = display_name
@@ -92,7 +101,7 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     background: transparent;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    font-family: 'Segoe UI', Arial, 'Helvetica Neue', Helvetica, sans-serif;
+    font-family: 'Tahoma', Geneva, sans-serif;
   }
   ${previewBg}
 
@@ -190,7 +199,7 @@ ${previewDivs}
 <div class="content">
   <div class="name-primary">${primaryName}</div>
   ${secondaryName ? `<div class="name-secondary">${secondaryName}</div>` : ''}
-  ${department ? `<div class="dept">${department}</div>` : ''}
+  ${resolvedDept ? `<div class="dept">${resolvedDept}</div>` : ''}
   ${company ? `<div class="company">${company}</div>` : ''}
   <div class="qr-wrap">
     <img src="${qrDataUrl}" alt="QR">
@@ -199,9 +208,7 @@ ${previewDivs}
 
 <div class="footer">
   <div class="ticket-type">${ticket_type.toUpperCase()}</div>
-  <div class="access-row">
-    ${buildAccessRow(access)}
-  </div>
+  ${(() => { const row = buildAccessRow(resolvedAccess); return row ? `<div class="access-row">${row}</div>` : ''; })()}
 </div>
 
 </body>

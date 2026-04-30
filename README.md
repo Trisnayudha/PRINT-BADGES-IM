@@ -188,6 +188,46 @@ Fitur yang tersedia:
 - Daftar antrian print (live refresh setiap 5 detik)
 - Tombol retry untuk job yang gagal
 - **Test print** — bisa langsung test cetak badge dari browser
+- **Ngrok URL** — muncul otomatis jika ngrok aktif, lengkap dengan tombol Copy
+
+---
+
+## Ngrok (Akses dari Luar Jaringan)
+
+Gunakan ngrok sebagai fallback jika tablet tidak bisa terhubung via WiFi lokal.
+
+### Menjalankan ngrok
+
+```bash
+ngrok http 3000
+```
+
+Setelah jalan, URL publik muncul di dashboard Monitor UI secara otomatis.
+
+### Cara print via ngrok
+
+Endpoint sama persis — cukup ganti base URL:
+
+| Mode | URL |
+|---|---|
+| Local (WiFi) | `http://192.168.1.10:3000/print` |
+| Ngrok | `https://xxxx-xxxx.ngrok-free.app/print` |
+
+Semua endpoint (`/print`, `/health`, `/api/queue`, dst.) langsung jalan tanpa konfigurasi tambahan di server.
+
+### Fallback logic di Flutter (rekomendasi)
+
+```dart
+// 1. Coba local dulu (cepat)
+// 2. Kalau gagal, fallback ke ngrok
+try {
+  await http.post(Uri.parse('http://192.168.1.10:3000/print'), ...).timeout(Duration(seconds: 3));
+} catch (_) {
+  await http.post(Uri.parse('https://xxxx.ngrok-free.app/print'), ...);
+}
+```
+
+> **Catatan:** URL ngrok berubah setiap kali ngrok di-restart (free plan). Selalu cek URL terbaru di Monitor UI.
 
 ---
 
