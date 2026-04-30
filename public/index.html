@@ -243,6 +243,7 @@ async function deleteJob(id) {
 
 function getTestPayload() {
   const ticket_type = document.getElementById('testTicket').value;
+  const isWorkingPass = ticket_type === 'Working Pass';
   const { ticket_color, access_areas } = TICKET_MAP[ticket_type] || { ticket_color: '#000000', access_areas: [] };
   return {
     display_name: document.getElementById('testDisplayName').value,
@@ -253,6 +254,7 @@ function getTestPayload() {
     ticket_color,
     access_areas,
     qr_code: document.getElementById('testQr').value,
+    badge_format: isWorkingPass ? 'badge_working_pass' : 'badge_default',
   };
 }
 
