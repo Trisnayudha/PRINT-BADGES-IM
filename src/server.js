@@ -56,6 +56,11 @@ function resolveTicketFields(data) {
   };
 }
 
+function resolveTicketFieldsPayload(payload) {
+  if (Array.isArray(payload)) return payload.map(resolveTicketFields);
+  return resolveTicketFields(payload);
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -118,7 +123,7 @@ app.post('/api/queue/retry', async (_, res) => {
 // ── Badge HTML preview (for UI live preview)
 app.post('/api/preview', async (req, res) => {
   try {
-    const html = await generateBadgeHtmlPreview(resolveTicketFields(req.body));
+    const html = await generateBadgeHtmlPreview(resolveTicketFieldsPayload(req.body));
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch (err) {
@@ -128,14 +133,16 @@ app.post('/api/preview', async (req, res) => {
 
 // ── MAIN: Print badge
 app.post('/print', async (req, res) => {
-  const data = resolveTicketFields(req.body);
+  const data = resolveTicketFieldsPayload(req.body);
+  const badges = Array.isArray(data) ? data : [data];
 
-  if (!data || (!data.name && !data.display_name)) {
+  if (!badges.length || badges.some(item => !item || (!item.name && !item.display_name))) {
     return res.status(400).json({ error: 'name or display_name is required' });
   }
 
-  const copies = data.copies || config.defaultCopies;
-  const job = queue.addJob({ ...data, copies });
+  const copies = (Array.isArray(data) ? badges[0]?.copies : data.copies) || config.defaultCopies;
+  const jobPayload = Array.isArray(data) ? { badges: data, copies } : { ...data, copies };
+  const job = queue.addJob(jobPayload);
 
   // Respond immediately so tablet doesn't wait
   res.json({ success: true, job_id: job.id, status: 'processing' });
@@ -151,7 +158,8 @@ async function processPrintJob(jobId, data, copies) {
     pdfPath = await generateBadgePdf(data);
     await printPdf(pdfPath, copies);
     queue.updateJob(jobId, { status: 'done', error: null });
-    console.log(`[PRINTED] ${data.display_name || data.name} | job ${jobId}`);
+    const label = Array.isArray(data) ? `${data.length} badge(s)` : (data.display_name || data.name);
+    console.log(`[PRINTED] ${label} | job ${jobId}`);
   } catch (err) {
     const errMsg = err?.message || String(err) || 'unknown error';
     const retries = (queue.getAllJobs().find(j => j.id === jobId)?.retries || 0) + 1;
@@ -170,7 +178,8 @@ setInterval(async () => {
   if (pending.length === 0) return;
   console.log(`[QUEUE] Retrying ${pending.length} pending job(s)...`);
   for (const job of pending) {
-    await processPrintJob(job.id, job.data, job.data.copies || config.defaultCopies);
+    const payload = Array.isArray(job.data?.badges) ? job.data.badges : job.data;
+    await processPrintJob(job.id, payload, job.data.copies || config.defaultCopies);
   }
 }, 60_000);
 

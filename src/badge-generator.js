@@ -34,7 +34,7 @@ function getFontSize(text, maxLen, baseSize, minSize) {
 }
 
 function buildAccessRow(access) {
-  // null/undefined → show all (fallback). Empty array [] → no access row (e.g. Working Pass).
+  // null/undefined -> show all (fallback). Empty array [] -> no access row (e.g. Working Pass).
   if (access === null || access === undefined) {
     return ['CONFERENCE', 'EXHIBITION', 'NETWORKING FUNCTIONS'].join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
   }
@@ -42,7 +42,7 @@ function buildAccessRow(access) {
   return access.map(a => a.toUpperCase()).join('&nbsp;&nbsp;&#8212;&nbsp;&nbsp;');
 }
 
-function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
+function buildBadgeSection(data, qrDataUrl, previewMode = false) {
   const {
     display_name,
     name,
@@ -68,6 +68,7 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
   const primaryFontSize = getFontSize(primaryName, 10, 34, 18);
 
   const { contentTop, contentHeight, footerTop, footerHeight } = LAYOUT;
+  const adjustedContentTop = isWorkingPassFormat ? contentTop : (contentTop + 3);
 
   const templateImage = isWorkingPassFormat ? 'badge_working_pass.png' : 'template-empty.png';
   const templateDataUrl = previewMode ? (() => {
@@ -77,21 +78,34 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
       const imgPath = fs.existsSync(preferredPath) ? preferredPath : fallbackPath;
       const buf = fs.readFileSync(imgPath);
       return `data:image/png;base64,${buf.toString('base64')}`;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   })() : null;
 
-  const previewBg = templateDataUrl ? `
-  .template-bg {
-    position: absolute;
-    top: 0; left: 0;
-    width: 105mm; height: 150mm;
-    background: url('${templateDataUrl}') no-repeat top left / 100% 100%;
-    z-index: 0;
-  }
-  .content, .footer { z-index: 1; }
-  ` : '';
+  const previewDivs = templateDataUrl
+    ? `<div class="template-bg" style="background-image:url('${templateDataUrl}')"></div>`
+    : '';
 
-  const previewDivs = templateDataUrl ? `<div class="template-bg"></div>` : '';
+  return `<section class="badge-page">
+${previewDivs}
+<div class="content ${isWorkingPassFormat ? 'working-pass' : ''}" style="top: ${adjustedContentTop}mm; height: ${contentHeight}mm;">
+  <div class="name-primary" style="font-size: ${primaryFontSize}pt;">${primaryName}</div>
+  ${secondaryName ? `<div class="name-secondary">${secondaryName}</div>` : ''}
+  ${resolvedDept ? `<div class="dept">${resolvedDept}</div>` : ''}
+  ${company ? `<div class="company">${company}</div>` : ''}
+  ${isWorkingPassFormat ? '' : `<div class="qr-wrap"><img src="${qrDataUrl}" alt="QR"></div>`}
+</div>
+
+${isWorkingPassFormat ? '' : `<div class="footer" style="top: ${footerTop}mm; height: ${footerHeight}mm;">
+  <div class="ticket-type">${ticket_type.toUpperCase()}</div>
+  ${(() => { const row = buildAccessRow(resolvedAccess); return row ? `<div class="access-row">${row}</div>` : ''; })()}
+</div>`}
+</section>`;
+}
+
+function buildBadgeHtml(items, qrDataUrls, previewMode = false) {
+  const pages = items.map((item, idx) => buildBadgeSection(item, qrDataUrls[idx], previewMode)).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -102,31 +116,55 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
 
   html, body {
     width: 105mm;
-    height: 150mm;
     background: transparent;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     font-family: 'Tahoma', Geneva, sans-serif;
   }
-  ${previewBg}
+
+  .badge-page {
+    width: 105mm;
+    height: 150mm;
+    position: relative;
+    page-break-after: always;
+    break-after: page;
+    overflow: hidden;
+  }
+
+  .badge-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .template-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 105mm;
+    height: 150mm;
+    background-repeat: no-repeat;
+    background-position: top left;
+    background-size: 100% 100%;
+    z-index: 0;
+  }
+
+  .content, .footer { z-index: 1; }
 
   /* Names top + optional QR bottom-right — overlaid on white box of pre-printed template */
   .content {
     position: absolute;
-    top: ${contentTop}mm;
     left: 5mm;
     right: 5mm;
-    height: ${contentHeight}mm;
     display: flex;
     flex-direction: column;
     padding: 5mm 2mm 4mm 6mm;
   }
 
   .content.working-pass {
-    top: 0;
+    top: 0 !important;
     left: 0;
     right: 0;
-    height: 150mm;
+    height: 150mm !important;
     justify-content: center;
     align-items: center;
     text-align: center;
@@ -134,7 +172,6 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
   }
 
   .name-primary {
-    font-size: ${primaryFontSize}pt;
     font-weight: 900;
     color: #000;
     line-height: 1;
@@ -165,7 +202,7 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
 
   /* Working pass only: make display name + company more prominent */
   .content.working-pass .name-primary {
-    font-size: 44pt;
+    font-size: 44pt !important;
     line-height: 1;
   }
 
@@ -174,7 +211,6 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     line-height: 1.25;
   }
 
-  /* QR floats to bottom-right, with some margin from edge */
   .qr-wrap {
     flex: 1;
     display: flex;
@@ -189,13 +225,10 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     height: 30mm;
   }
 
-  /* DELEGATE + access — overlaid on gold footer of pre-printed template */
   .footer {
     position: absolute;
-    top: ${footerTop}mm;
     left: 0;
     right: 0;
-    height: ${footerHeight}mm;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -209,6 +242,7 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     font-weight: 900;
     color: #000;
     letter-spacing: 0.5pt;
+    text-decoration: none !important;
   }
 
   .access-row {
@@ -218,41 +252,43 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     font-weight: 700;
     color: #000;
     letter-spacing: 0.3pt;
+    text-decoration: none !important;
+  }
+
+  .ticket-type *, .access-row * {
+    text-decoration: none !important;
+  }
+
+  @page {
+    size: 105mm 150mm;
+    margin: 0;
   }
 </style>
 </head>
 <body>
-${previewDivs}
-<div class="content ${isWorkingPassFormat ? 'working-pass' : ''}">
-  <div class="name-primary">${primaryName}</div>
-  ${secondaryName ? `<div class="name-secondary">${secondaryName}</div>` : ''}
-  ${resolvedDept ? `<div class="dept">${resolvedDept}</div>` : ''}
-  ${company ? `<div class="company">${company}</div>` : ''}
-  ${isWorkingPassFormat ? '' : `<div class="qr-wrap"><img src="${qrDataUrl}" alt="QR"></div>`}
-</div>
-
-${isWorkingPassFormat ? '' : `<div class="footer">
-  <div class="ticket-type">${ticket_type.toUpperCase()}</div>
-  ${(() => { const row = buildAccessRow(resolvedAccess); return row ? `<div class="access-row">${row}</div>` : ''; })()}
-</div>`}
-
+${pages}
 </body>
 </html>`;
 }
 
-async function generateBadgePdf(data) {
-  let qrDataUrl = '';
-  if (data.badge_format !== 'badge_working_pass') {
+async function buildQrDataUrls(items) {
+  return Promise.all(items.map(async (data) => {
+    if (data.badge_format === 'badge_working_pass') return '';
+
     const qrContent = data.qr_code || data.badge_id || data.guest_id || 'NO-QR';
-    qrDataUrl = await QRCode.toDataURL(qrContent, {
+    return QRCode.toDataURL(qrContent, {
       errorCorrectionLevel: 'M',
       margin: 1,
       width: 300,
       color: { dark: '#000000', light: '#ffffff' },
     });
-  }
+  }));
+}
 
-  const html = buildBadgeHtml(data, qrDataUrl);
+async function generateBadgePdf(data) {
+  const items = Array.isArray(data) ? data : [data];
+  const qrDataUrls = await buildQrDataUrls(items);
+  const html = buildBadgeHtml(items, qrDataUrls);
   const b = await getBrowser();
   const page = await b.newPage();
 
@@ -261,8 +297,7 @@ async function generateBadgePdf(data) {
     const pdfPath = path.join(TEMP_DIR, `badge_${Date.now()}.pdf`);
     await page.pdf({
       path: pdfPath,
-      width: '105mm',
-      height: '150mm',
+      preferCSSPageSize: true,
       printBackground: false, // transparent — only text+QR prints over pre-printed template
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
     });
@@ -273,17 +308,9 @@ async function generateBadgePdf(data) {
 }
 
 async function generateBadgeHtmlPreview(data) {
-  let qrDataUrl = '';
-  if (data.badge_format !== 'badge_working_pass') {
-    const qrContent = data.qr_code || data.badge_id || data.guest_id || 'NO-QR';
-    qrDataUrl = await QRCode.toDataURL(qrContent, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 300,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
-  }
-  return buildBadgeHtml(data, qrDataUrl, true);
+  const items = Array.isArray(data) ? data : [data];
+  const qrDataUrls = await buildQrDataUrls(items);
+  return buildBadgeHtml(items, qrDataUrls, true);
 }
 
 async function closeBrowser() {
