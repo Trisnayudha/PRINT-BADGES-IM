@@ -163,6 +163,17 @@ function buildBadgeHtml(data, qrDataUrl, previewMode = false) {
     line-height: 1.3;
   }
 
+  /* Working pass only: make display name + company more prominent */
+  .content.working-pass .name-primary {
+    font-size: 44pt;
+    line-height: 1;
+  }
+
+  .content.working-pass .company {
+    font-size: 18pt;
+    line-height: 1.25;
+  }
+
   /* QR floats to bottom-right, with some margin from edge */
   .qr-wrap {
     flex: 1;
