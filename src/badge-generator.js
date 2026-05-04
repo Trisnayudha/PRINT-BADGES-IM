@@ -16,6 +16,29 @@ const LAYOUT = {
   footerHeight: 30.5,
 };
 
+// Template reference: 1240 x 1772 px == 105 x 150 mm
+// Use px to make adjustment easier, then convert to mm internally.
+const MM_PER_PX = 150 / 1772;
+const pxToMm = (px) => px * MM_PER_PX;
+
+// Quick layout tuning (px). Positive value = move down, negative = move up.
+// Fokus utama: delegate/non-working badge.
+// Example: BADGE_ALL_Y_PX=20 npm start
+function numEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const ADJUST = {
+  allYPx: numEnv('BADGE_ALL_Y_PX', 0),
+  delegateContentYPx: numEnv('BADGE_DELEGATE_CONTENT_Y_PX', 35),
+  nameBlockYPx: numEnv('BADGE_NAME_BLOCK_Y_PX', 0),
+  passRowYPx: numEnv('BADGE_PASS_ROW_Y_PX', 0),
+  qrYPx: numEnv('BADGE_QR_Y_PX', 0),
+};
+
 let browser = null;
 
 async function getBrowser() {
@@ -68,7 +91,11 @@ function buildBadgeSection(data, qrDataUrl, previewMode = false) {
   const primaryFontSize = getFontSize(primaryName, 10, 34, 18);
 
   const { contentTop, contentHeight, footerTop, footerHeight } = LAYOUT;
-  const adjustedContentTop = isWorkingPassFormat ? contentTop : (contentTop + 3);
+  const adjustedContentTop = contentTop
+    + pxToMm(ADJUST.allYPx)
+    + pxToMm(ADJUST.nameBlockYPx)
+    + (isWorkingPassFormat ? 0 : pxToMm(ADJUST.delegateContentYPx));
+  const adjustedFooterTop = footerTop + pxToMm(ADJUST.allYPx) + pxToMm(ADJUST.passRowYPx);
 
   const templateImage = isWorkingPassFormat ? 'badge_working_pass.png' : 'template-empty.png';
   const templateDataUrl = previewMode ? (() => {
@@ -97,7 +124,7 @@ ${previewDivs}
   ${isWorkingPassFormat ? '' : `<div class="qr-wrap"><img src="${qrDataUrl}" alt="QR"></div>`}
 </div>
 
-${isWorkingPassFormat ? '' : `<div class="footer" style="top: ${footerTop}mm; height: ${footerHeight}mm;">
+${isWorkingPassFormat ? '' : `<div class="footer" style="top: ${adjustedFooterTop}mm; height: ${footerHeight}mm;">
   <div class="ticket-type">${ticket_type.toUpperCase()}</div>
   ${(() => { const row = buildAccessRow(resolvedAccess); return row ? `<div class="access-row">${row}</div>` : ''; })()}
 </div>`}
@@ -217,7 +244,7 @@ function buildBadgeHtml(items, qrDataUrls, previewMode = false) {
     justify-content: flex-end;
     align-items: flex-end;
     padding-right: 5mm;
-    padding-bottom: 2mm;
+    padding-bottom: ${2 + pxToMm(ADJUST.qrYPx)}mm;
   }
 
   .qr-wrap img {
